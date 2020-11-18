@@ -8,8 +8,8 @@ module.exports = {
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended",
     "plugin:@typescript-eslint/recommended-requiring-type-checking",
-    "plugin:prettier/recommended",
-    "prettier/@typescript-eslint",
+    // "plugin:prettier/recommended",
+    // "prettier/@typescript-eslint",
     "plugin:import/errors",
     "plugin:import/warnings",
     "plugin:import/typescript"
@@ -30,7 +30,7 @@ module.exports = {
   },
   rules: {
     "@typescript-eslint/array-type": "error",
-    "@typescript-eslint/consistent-type-assertions": "error",
+    "@typescript-eslint/consistent-type-assertions": ["error", "angle-bracket"],
     "@typescript-eslint/consistent-type-definitions": "error",
     "@typescript-eslint/explicit-function-return-type": "off",
     "@typescript-eslint/explicit-member-accessibility": [
@@ -39,6 +39,8 @@ module.exports = {
         accessibility: "explicit"
       }
     ],
+    "no-empty": "off",
+    "@typescript-eslint/no-unsafe-member-access": "off",
     "@typescript-eslint/no-explicit-any": "off",
     "@typescript-eslint/no-parameter-properties": "off",
     "@typescript-eslint/no-unused-expressions": "error",
@@ -79,7 +81,7 @@ module.exports = {
     "no-underscore-dangle": "warn",
     "no-var": "error",
     "object-shorthand": "error",
-    "one-var": ["error", "never"],
+    "one-var": ["off", "never"],
     "quote-props": "off",
     radix: "error",
     "sort-imports": "warn",

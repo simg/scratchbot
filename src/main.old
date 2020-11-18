@@ -11,13 +11,19 @@ import { memoryUsage } from "process";
 //   source   : Source ;
 // }
 
+function _source(source : Source) : Drone.PowerSource {
+
+  return {
+    capacity:sourceCapacity(source),
+    source : source
+  }
+}
 
 export const loop = ErrorMapper.wrapLoop(() => {
 
   // Automatically delete memory of missing creeps
   for (const name in Memory.creeps) {
     if (!(name in Game.creeps)) {
-      console.log("A creep died!")
       delete Memory.creeps[name];
     }
   }
@@ -30,24 +36,24 @@ export const loop = ErrorMapper.wrapLoop(() => {
         ),
         construction  = spawn1.room.find(FIND_MY_CONSTRUCTION_SITES),
         extensions    = spawn1.room.find(FIND_MY_STRUCTURES, { filter : { structureType : STRUCTURE_EXTENSION }}),
-        creepsByRole : any = _.assign({ harvester:[] }, _.groupBy(creeps, creep => (<Drone.Mem>creep.memory).role)),
-        { harvester } = creepsByRole,
+        harvesters    = creeps.filter(creep => (<Drone.Mem>creep.memory).role === 'harvester'),
+        miners        = creeps.filter(creep => (<Drone.Mem>creep.memory).role === 'miner'),
+        fighters      = creeps.filter(creep => (<Drone.Mem>creep.memory).role === 'fighter'),
+        upgraders     = creeps.filter(creep => (<Drone.Mem>creep.memory).role === 'upgrader'),
         threats       = spawn1.room.find(FIND_HOSTILE_CREEPS),
         sourceKeepers = threats.filter(threat => threat.owner.username === 'Source Keeper'),
         level         = (spawn1.room.controller?.level || 0);
 
-  if (Game.time % 5 == 0) {
-    console.log(`Current game tick is ${Game.time}, creeps : ${creeps.length}, level: ${level}`);
-  }
-  //console.log('builders', Drone.filterByCommand(harvester, {op:'buildnear'}).length);
-  //console.log("deliver to controller")
-  //Drone.filterByCommand(harvester, {op:'deliver', operand:spawn1.room.controller!.id}).length
+  console.log(`Current game tick is ${Game.time}, creeps : ${creeps.length}`);
 
-  if (spawn1.room.controller !== undefined) {
+  //console.log("creeps.length", creeps.length)
 
-    if ( level == 2 ) {
+  if (spawn1.store.getFreeCapacity(RESOURCE_ENERGY) === 0 ) {
 
-      //buildRoad(spawn1.pos, sources[1].pos, spawn1);
+    //if ((spawn1.room.controller?.level || 0) < 3 ) {
+
+    if ( level == 2 && creeps.length >= 6) {
+      //buildRoad(spawn1.pos, sources[0].pos, spawn1);
       //buildExtensions(spawn1, {x:10, y:10})
       const newExtensions = [
         [20, 20],
@@ -62,8 +68,8 @@ export const loop = ErrorMapper.wrapLoop(() => {
         [20, 29],
         [20, 30],
       ];
-      //console.log("existing, new", extensions.length, newExtensions.length)
-      if (construction.length === 0 && extensions.length < newExtensions.length) {
+      console.log("existing, new", extensions.length, newExtensions.length)
+      if (extensions.length < newExtensions.length) {
         const ext = newExtensions[extensions.length],
               res = spawn1.room.createConstructionSite(ext[0], ext[1], STRUCTURE_EXTENSION);
         if (res !== 0) {
@@ -72,47 +78,27 @@ export const loop = ErrorMapper.wrapLoop(() => {
       }
     }
 
-    //if (spawn1.store.getFreeCapacity(RESOURCE_ENERGY) === 0 ) {
-    if (spawn1.room.energyCapacityAvailable === spawn1.room.energyAvailable ) {
+    // if (creeps.length === 6 && spawn1.room.controller !== undefined) {
+    //   buildRoad(spawn1.room.controller.pos, sources[0].pos, spawn1);
+    // }
 
-      if (Drone.filterByCommand(harvester, {op:'deliver', operand:spawn1.id}).length < 3) {
+    if (creeps.length < 3) {
+      Drone.spawn(
+        spawn1, 'harvester',
+        spawn1.store.getUsedCapacity(RESOURCE_ENERGY),
+        Drone.harvest(sources[0], spawn1)
+      );
+    }
+
+    else if (creeps.length < 8) {
+      if (spawn1.room.controller) {
         Drone.spawn(
           spawn1, 'harvester',
           spawn1.store.getUsedCapacity(RESOURCE_ENERGY),
-          Drone.harvest(sources[0], spawn1)
+          Drone.harvest(sources[0], spawn1.room.controller)
         );
       }
-
-      else if (Drone.filterByCommand(harvester, {op:'upgrade', operand:spawn1.room.controller!.id}).length < 3) {
-        console.log("spawn harvester 1")
-        Drone.spawn(
-          spawn1, 'harvester',
-          spawn1.store.getUsedCapacity(RESOURCE_ENERGY),
-          Drone.upgrade(sources[0], spawn1.room.controller)
-        );
-      }
-
-      else if (level >= 2) {
-        console.log("level2")
-
-        if (Drone.filterByCommand(harvester, {op:'buildnear'}).length < 3) {
-          console.log("spawn builder")
-          Drone.spawn(
-            spawn1, 'builder',
-            spawn1.store.getUsedCapacity(RESOURCE_ENERGY),
-            Drone.buildnear(sources[1])
-          );
-        }
-
-        else if (Drone.filterByCommand(harvester, {op:'deliver', operand:spawn1.id}).length < 6) {
-          console.log("spawn harvester 2")
-          Drone.spawn(
-            spawn1, 'harvester',
-            spawn1.store.getUsedCapacity(RESOURCE_ENERGY),
-            Drone.recharge(sources[2])
-          );
-        }
-
+    }
 
     // else if (creeps.length < 6) {
 
@@ -141,29 +127,35 @@ export const loop = ErrorMapper.wrapLoop(() => {
     //   }
     // }
 
+    else if (level >= 2) {
+console.log("level2")
 
-      // creepsByRole.harvester
-      //   .filter((creep : Creep) => Drone.hasCommand(creep, { op: 'deliver', operand: spawn1.room.controller!.id}))
-      //   .forEach((creep : Creep) => {
-      //     const mem = (<Drone.Mem>creep.memory);
-      //     mem.task = {
-      //       //cmds : Drone.buildnear(findLeastServedMiner(spawn1.room, miners)),
-      //       cmds : Drone.buildnear(sources[0]),
-      //       ptr  : 0
-      //     }
-      //     //mem.role = 'builder'
-      //   });
+      harvesters
+         .filter(creep => {
+           const mem = (<Drone.Mem>creep.memory),
+                 cmd = mem.task.cmds[1];
+           return (cmd.op === 'deliver' && cmd.operand === spawn1.room.controller?.id);
+        })
+        .forEach(creep => {
+          const mem = (<Drone.Mem>creep.memory);
+          mem.task = {
+            //cmds : Drone.buildnear(findLeastServedMiner(spawn1.room, miners)),
+            cmds : Drone.buildnear(sources[0]),
+            ptr  : 0
+          }
+          //mem.role = 'builder'
+        });
 
-      // if (extensions.length > 3) {
-      //   if (creeps.length < 15) {
+      if (extensions.length > 3) {
+        if (creeps.length < 15) {
 
-      //     Drone.spawn(
-      //       spawn1, 'harvester', //'builder',
-      //       spawn1.store.getUsedCapacity(RESOURCE_ENERGY),
-      //       // Drone.buildnear(findLeastServedMiner(spawn1.room, miners))
-      //       Drone.buildnear(sources[0])
-      //     );
-      //   }
+          Drone.spawn(
+            spawn1, 'harvester', //'builder',
+            spawn1.store.getUsedCapacity(RESOURCE_ENERGY),
+            // Drone.buildnear(findLeastServedMiner(spawn1.room, miners))
+            Drone.buildnear(sources[0])
+          );
+        }
 
         else {
           // if (extensions.length > 3) {
@@ -200,22 +192,22 @@ export const loop = ErrorMapper.wrapLoop(() => {
 
   //console.log("threats", threats.length, fighters.length)
 
-  // threats.forEach(threat => {
-  //   const spareFighters = fighters.filter(creep => {
-  //     const mem = (<Drone.Mem>creep.memory);
-  //     //console.log("op", mem.task.cmds.length, mem.task.ptr, mem.task.cmds[mem.task.ptr || 0].op)
-  //     //console.log("task", mem.task)
-  //     return mem.task.ptr == undefined || mem.task.cmds[mem.task.ptr].op === 'patrol' || mem.task.cmds[mem.task.ptr] == undefined;
-  //   });
-  //   //console.log("spareFighters.length", spareFighters.length)
-  //   if (spareFighters.length < 3) {
-  //     // wait until stronger
-  //   } else {
-  //     _.take(spareFighters, 3).forEach(creep => {
-  //       (<Drone.Mem>creep.memory).task = { cmds:[{ op:'attack', operand: threat.id}], ptr:0 };
-  //     })
-  //   }
-  // });
+  threats.forEach(threat => {
+    const spareFighters = fighters.filter(creep => {
+      const mem = (<Drone.Mem>creep.memory);
+      //console.log("op", mem.task.cmds.length, mem.task.ptr, mem.task.cmds[mem.task.ptr || 0].op)
+      //console.log("task", mem.task)
+      return mem.task.ptr == undefined || mem.task.cmds[mem.task.ptr].op === 'patrol' || mem.task.cmds[mem.task.ptr] == undefined;
+    });
+    //console.log("spareFighters.length", spareFighters.length)
+    if (spareFighters.length < 3) {
+      // wait until stronger
+    } else {
+      _.take(spareFighters, 3).forEach(creep => {
+        (<Drone.Mem>creep.memory).task = { cmds:[{ op:'attack', operand: threat.id}], ptr:0 };
+      })
+    }
+  });
 
   //console.log("spawnFeeders.length",spawnFeeders.length);
   // if (Memory.road1 == undefined) {
@@ -243,7 +235,6 @@ export const loop = ErrorMapper.wrapLoop(() => {
 
   // });
 
-  //}
 
   creeps.forEach(creep => {
     Drone.run(creep);
@@ -429,6 +420,12 @@ interface Weighted {
 }
 
 
+function sourceCapacity(source : Source) : number {
+  const spots = source?.room?.lookAtArea(source.pos.y-1, source.pos.x-1, source.pos.y+1, source.pos.x+1, true)
+    .filter((tile: LookAtResult) => tile.type === 'terrain' && tile.terrain === 'plain')
+    .length;
+  return spots || 0;
+}
 
 // type Tile = { type : 'creep',     creep: Creep     } |
 //             { type : 'terrain',   terrain: string  } |
